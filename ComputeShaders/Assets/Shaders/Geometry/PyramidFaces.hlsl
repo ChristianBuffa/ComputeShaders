@@ -4,7 +4,7 @@
 
 // Include helper functions from URP
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-#include "NMGGeometryHelpers.hlsl"
+#include "Assets/Shaders/Geometry/NMGGeometryHelper.hlsl"
 
 // This structure is created by the renderer and passed to the Vertex function
 // It holds data stored on the model, per vertex
@@ -104,19 +104,19 @@ float4 Fragment(GeometryOutput input) : SV_Target{
     // It's enough to signal that should will cast a shadow
     return 0;
 #else
-    // Initialize some information for the lighting function
-    InputData lightingInput = (InputData)0;
-    lightingInput.positionWS = input.positionWS;
-    lightingInput.normalWS = input.normalWS; // No need to renormalize, since triangles all share normals
-    lightingInput.viewDirectionWS = GetViewDirectionFromPosition(input.positionWS);
-    lightingInput.shadowCoord = CalculateShadowCoord(input.positionWS, input.positionCS);
+ // Initialize some information for the lighting function
+InputData lightingInput = (InputData)0;
+lightingInput.positionWS = input.positionWS;
+lightingInput.normalWS = input.normalWS; // No need to renormalize, since triangles all share normals
+lightingInput.viewDirectionWS = GetViewDirectionFromPosition(input.positionWS);
+lightingInput.shadowCoord = CalculateShadowCoord(input.positionWS, input.positionCS);
 
-    // Read the main texture
-    float3 albedo = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv).rgb;
+// Read the main texture
+float3 albedo = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv).rgb;
 
-    // Call URP's simple lighting function
-    // The arguments are lightingInput, albedo color, specular color, smoothness, emission color, and alpha
-    return UniversalFragmentBlinnPhong(lightingInput, albedo, 1, 0, 0, 1);
+// Call URP's simple lighting function
+// The arguments are lightingInput, albedo color, specular color, smoothness, emission color, and alpha
+return UniversalFragmentBlinnPhong(lightingInput, albedo, 1, 0, 0, 1, 0);
 #endif
 }
 
