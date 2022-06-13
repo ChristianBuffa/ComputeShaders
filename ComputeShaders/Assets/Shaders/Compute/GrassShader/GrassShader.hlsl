@@ -4,7 +4,7 @@
 
 // Include some helper functions
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-#include "NMGGrassLayersHelpers.hlsl"
+#include "Assets/Shaders/Compute/GrassShader/NMGGrassLayersHelpers.hlsl"
 
 // This describes a vertex on the generated mesh
 struct DrawVertex {
@@ -12,9 +12,17 @@ struct DrawVertex {
     float3 normalWS; // normal in world space
     float2 uv; // UV
 };
+// We have to insert three draw vertices at once so the triangle stays connected
+// in the graphics shader. This structure does that
+struct DrawTriangle {
+    float2 heights; // clipping height, color lerp
+    DrawVertex vertices[3];
+};
+// The buffer to draw from
+StructuredBuffer<DrawTriangle> _DrawTriangles;
 
 struct VertexOutput {
-    float3 uvAndHeight  : TEXCOORD0; // UV, no scaling applied, plus the layer height in the z-coord
+    float4 uvAndHeight  : TEXCOORD0; // UV, no scaling applied, plus the layer height in the z-coord
     float3 positionWS   : TEXCOORD1; // Position in World Space
     float3 normalWS     : TEXCOORD2; // Normal vector in world space
 
@@ -24,7 +32,6 @@ struct VertexOutput {
 // Properties
 float4 _BaseColor;
 float4 _TopColor;
-float _TotalHeight; // Height of the top layer
 // These two textures are combined to create the grass pattern in the fragment function
 TEXTURE2D(_DetailNoiseTexture); SAMPLER(sampler_DetailNoiseTexture); float4 _DetailNoiseTexture_ST;
 float _DetailDepthScale;
@@ -37,70 +44,39 @@ float _WindAmplitude;
 
 // Vertex functions
 
-VertexOutput Vertex(Attributes input) {
+VertexOutput Vertex(uint vertexID: SV_VertexID) {
     // Initialize the output struct
     VertexOutput output = (VertexOutput)0;
 
-    // Calculate position and normal in world space
-    VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
-    VertexNormalInputs normalInput = GetVertexNormalInputs(input.normalOS, input.tangentOS);
-    output.positionWS = vertexInput.positionWS;
-    output.normalWS = normalInput.normalWS;
+    // Get the vertex from the buffer
+    // Since the buffer is structured in triangles, we need to divide the vertexID by three
+    // to get the triangle, and then modulo by 3 to get the vertex on the triangle
+    DrawTriangle tri = _DrawTriangles[vertexID / 3];
+    DrawVertex input = tri.vertices[vertexID % 3];
 
-    // Pass through the UV
-    output.uv = input.uv;
-    return output;
-}
-
-// Geometry functions
-
-// This function sets values in output after calculating position based on height
-void SetupVertex(in VertexOutput input, inout GeometryOutput output, float height) {
-
-    // Extrude the position outwards along the normal based on the passed in height
-    float3 positionWS = input.positionWS + input.normalWS * (height * _TotalHeight);
-
-    output.positionWS = positionWS;
+    output.positionWS = input.positionWS;
     output.normalWS = input.normalWS;
-    output.uv = float3(input.uv, height); // Store the layer height in uv.z
-    output.positionCS = CalculatePositionCSWithShadowCasterLogic(positionWS, input.normalWS);
-}
+    output.uvAndHeight = float4(input.uv, tri.heights);
+    // Apply shadow caster logic to the CS position
+    output.positionCS = CalculatePositionCSWithShadowCasterLogic(output.positionWS, output.normalWS);
 
-// We create GRASS_LAYERS triangles which have 3 vertices each
-[maxvertexcount(3 * GRASS_LAYERS)]
-void Geometry(triangle VertexOutput inputs[3], inout TriangleStream<GeometryOutput> outputStream) {
-    // Initialize the output struct
-    GeometryOutput output = (GeometryOutput)0;
-
-    // For each layer...
-    for (int l = 0; l < GRASS_LAYERS; l++) {
-        // Calculate the height percent
-        float h = l / (float)(GRASS_LAYERS - 1);
-        // For each point in the triangle...
-        for (int t = 0; t < 3; t++) {
-            // Calculate the output data and add the vertex to the output stream
-            SetupVertex(inputs[t], output, h);
-            outputStream.Append(output);
-        }
-        // Each triangle is disconnected, so we need to call this to restart the triangle strip
-        outputStream.RestartStrip();
-    }
+    return output;
 }
 
 // Fragment functions
 
-half4 Fragment(GeometryOutput input) : SV_Target{
+half4 Fragment(VertexOutput input) : SV_Target{
 
-    // Height percent is uv.z
-    float height = input.uv.z;
+    float2 uv = input.uvAndHeight.xy;
+    float height = input.uvAndHeight.z;
 
 // Calculate wind
 // Get the wind noise texture uv by applying scale and offset and then adding a time offset
-float2 windUV = TRANSFORM_TEX(input.uv.xy, _WindNoiseTexture) + _Time.y * _WindTimeMult;
+float2 windUV = TRANSFORM_TEX(uv, _WindNoiseTexture) + _Time.y * _WindTimeMult;
 // Sample the wind noise texture and remap to range from -1 to 1
 float2 windNoise = SAMPLE_TEXTURE2D(_WindNoiseTexture, sampler_WindNoiseTexture, windUV).xy * 2 - 1;
 // Offset the grass UV by the wind. Higher layers are affected more
-float2 uv = input.uv.xy + windNoise * (_WindAmplitude * height);
+uv = uv + windNoise * (_WindAmplitude * height);
 
 // Sample the two noise textures, applying their scale and offset
 float detailNoise = SAMPLE_TEXTURE2D(_DetailNoiseTexture, sampler_DetailNoiseTexture, TRANSFORM_TEX(uv, _DetailNoiseTexture)).r;
@@ -126,11 +102,12 @@ clip(detailNoise* smoothNoise - height);
     lightingInput.shadowCoord = CalculateShadowCoord(input.positionWS, input.positionCS); // Calculate the shadow map coord
 
     // Lerp between the two grass colors based on layer height
-    float3 albedo = lerp(_BaseColor, _TopColor, height).rgb;
+    float colorLerp = input.uvAndHeight.w;
+    float3 albedo = lerp(_BaseColor, _TopColor, colorLerp).rgb;
 
     // The URP simple lit algorithm
     // The arguments are lighting input data, albedo color, specular color, smoothness, emission color, and alpha
-    return UniversalFragmentBlinnPhong(lightingInput, albedo, 1, 0, 0, 1);
+    return UniversalFragmentBlinnPhong(lightingInput, albedo, 1, 0, 0, 1, 0);
 #endif
 }
 
