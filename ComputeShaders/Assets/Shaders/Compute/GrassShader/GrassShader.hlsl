@@ -4,7 +4,7 @@
 
 // Include some helper functions
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
-#include "Assets/Shaders/Compute/GrassShader/NMGGrassLayersHelpers.hlsl"
+#include "NMGGrassLayersHelpers.hlsl"
 
 // This describes a vertex on the generated mesh
 struct DrawVertex {
@@ -22,8 +22,8 @@ struct DrawTriangle {
 StructuredBuffer<DrawTriangle> _DrawTriangles;
 
 struct VertexOutput {
-    float4 uvAndHeight  : TEXCOORD0; // UV, no scaling applied, plus the layer height in the z-coord
-    float3 positionWS   : TEXCOORD1; // Position in World Space
+    float4 uvAndHeight  : TEXCOORD0; // (U, V, clipping noise height, color lerp)
+    float3 positionWS   : TEXCOORD1; // Position in world space
     float3 normalWS     : TEXCOORD2; // Normal vector in world space
 
     float4 positionCS   : SV_POSITION; // Position in clip space
@@ -70,25 +70,25 @@ half4 Fragment(VertexOutput input) : SV_Target{
     float2 uv = input.uvAndHeight.xy;
     float height = input.uvAndHeight.z;
 
-// Calculate wind
-// Get the wind noise texture uv by applying scale and offset and then adding a time offset
-float2 windUV = TRANSFORM_TEX(uv, _WindNoiseTexture) + _Time.y * _WindTimeMult;
-// Sample the wind noise texture and remap to range from -1 to 1
-float2 windNoise = SAMPLE_TEXTURE2D(_WindNoiseTexture, sampler_WindNoiseTexture, windUV).xy * 2 - 1;
-// Offset the grass UV by the wind. Higher layers are affected more
-uv = uv + windNoise * (_WindAmplitude * height);
+    // Calculate wind
+    // Get the wind noise texture uv by applying scale and offset and then adding a time offset
+    float2 windUV = TRANSFORM_TEX(uv, _WindNoiseTexture) + _Time.y * _WindTimeMult;
+    // Sample the wind noise texture and remap to range from -1 to 1
+    float2 windNoise = SAMPLE_TEXTURE2D(_WindNoiseTexture, sampler_WindNoiseTexture, windUV).xy * 2 - 1;
+    // Offset the grass UV by the wind. Higher layers are affected more
+    uv = uv + windNoise * (_WindAmplitude * height);
 
-// Sample the two noise textures, applying their scale and offset
-float detailNoise = SAMPLE_TEXTURE2D(_DetailNoiseTexture, sampler_DetailNoiseTexture, TRANSFORM_TEX(uv, _DetailNoiseTexture)).r;
-float smoothNoise = SAMPLE_TEXTURE2D(_SmoothNoiseTexture, sampler_SmoothNoiseTexture, TRANSFORM_TEX(uv, _SmoothNoiseTexture)).r;
-// Combine the textures together using these scale variables. Lower values will reduce a texture's influence
-detailNoise = 1 - (1 - detailNoise) * _DetailDepthScale;
-smoothNoise = 1 - (1 - smoothNoise) * _SmoothDepthScale;
-// If detailNoise * smoothNoise is less than height, this pixel will be discarded by the renderer
-// I.E. this pixel will not render. The fragment function returns as well
-clip(detailNoise* smoothNoise - height);
+    // Sample the two noise textures, applying their scale and offset
+    float detailNoise = SAMPLE_TEXTURE2D(_DetailNoiseTexture, sampler_DetailNoiseTexture, TRANSFORM_TEX(uv, _DetailNoiseTexture)).r;
+    float smoothNoise = SAMPLE_TEXTURE2D(_SmoothNoiseTexture, sampler_SmoothNoiseTexture, TRANSFORM_TEX(uv, _SmoothNoiseTexture)).r;
+    // Combine the textures together using these scale variables. Lower values will reduce a texture's influence
+    detailNoise = 1 - (1 - detailNoise) * _DetailDepthScale;
+    smoothNoise = 1 - (1 - smoothNoise) * _SmoothDepthScale;
+    // If detailNoise * smoothNoise is less than height, this pixel will be discarded by the renderer
+    // I.E. this pixel will not render. The fragment function returns as well
+    clip(detailNoise* smoothNoise - height);
 
-// If the code reaches this far, this pixel should render
+    // If the code reaches this far, this pixel should render
 
 #ifdef SHADOW_CASTER_PASS
     // If we're in the shadow caster pass, it's enough to return now. We don't care about color
