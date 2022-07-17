@@ -38,7 +38,7 @@ Material:
         m_Offset: {x: 0, y: 0}
     - _DetailNoiseTexture:
         m_Texture: {fileID: 2800000, guid: 91e9e2e0497f16749a457f27f5f71c50, type: 3}
-        m_Scale: {x: 6, y: 6}
+        m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailNormalMap:
         m_Texture: {fileID: 0}
@@ -65,8 +65,8 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SmoothNoiseTexture:
-        m_Texture: {fileID: 2800000, guid: a6d11fa9a2215884cb93079573d0c6e4, type: 3}
-        m_Scale: {x: 6, y: 6}
+        m_Texture: {fileID: 2800000, guid: 8cb71acb618bb54439e653ab2d783b96, type: 3}
+        m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
         m_Texture: {fileID: 0}
@@ -98,7 +98,7 @@ Material:
     - _Cull: 2
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
-    - _DetailDepthScale: 0.321
+    - _DetailDepthScale: 0.784
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
     - _EnvironmentReflections: 1
@@ -110,23 +110,23 @@ Material:
     - _Parallax: 0.005
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _SmoothDepthScale: 0.736
+    - _SmoothDepthScale: 0.774
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _Surface: 0
-    - _TotalHeight: 0.5
+    - _TotalHeight: 0.4
     - _WindAmplitude: 0.1
-    - _WindTimeMult: 0.1
+    - _WindTimeMult: 0.01
     - _WorkflowMode: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.1794448, g: 0.6320754, b: 0.08050018, a: 1}
+    - _BaseColor: {r: 0.060646906, g: 0.33962262, b: 0, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.2, g: 0.2, b: 0.2, a: 1}
-    - _TopColor: {r: 0, g: 1, b: 0, a: 1}
+    - _TopColor: {r: 0.45376468, g: 0.9716981, b: 0.45376468, a: 1}
   m_BuildTextureStacks: []
 --- !u!114 &400126896059478037
 MonoBehaviour:
