@@ -10,22 +10,22 @@ public class ProceduralGrassRenderer : MonoBehaviour
     [System.Serializable]
     public class GrassSettings
     {
-        [Tooltip("The totale height of the grass layer stack")]
+        [Tooltip("The total height of the grass layer stack")]
         public float grassHeight = 0.5f;
         [Tooltip("The maximum number of layers")]
         public int maxLayers = 16;
-        [Tooltip("Level-of-detail settings. As the camera moves away, the shader will decrease the number of layers. \n " +
+        [Tooltip("Level-of-detail settings. As the camera moves away, the shader will decrease the number of layers.\n " +
             "This is the distance from the camera LOD will start to take effect")]
         public float lodMinCameraDistance = 1;
-        [Tooltip("Level-of-detail settings. As the camera moves away, the shader will decrease the number of layers. \n " +
+        [Tooltip("Level-of-detail settings. As the camera moves away, the shader will decrease the number of layers.\n " +
             "This is the distance from the camera the grass will have the fewest possible layers")]
         public float lodMaxCameraDistance = 1;
-        [Tooltip("Level-of-detail settings. As the camera moves away, the shader will decrease the number of layers. \n " +
+        [Tooltip("Level-of-detail settings. As the camera moves away, the shader will decrease the number of layers.\n " +
             "This is a power applied to the distance lerp to control layer falloff")]
-        public float lodFactor = 1;
+        public float lodFactor = 2;
         [Tooltip("Use world position XZ as the UV. Useful for tiling")]
         public bool useWorldPositionAsUV;
-        [Tooltip("Multiplier in world position when using it as a UV")]
+        [Tooltip("Multiplier on world position when using it as a UV")]
         public float worldPositionUVScale;
     }
 
@@ -61,12 +61,12 @@ public class ProceduralGrassRenderer : MonoBehaviour
     // A compute buffer to hold indirect draw arguments
     private ComputeBuffer argsBuffer;
     // We have to instantiate the shaders so each points to their unique compute buffers
-    // An instatiated copy of the grass compute shader
+    // An instantiated copy of the grass compute shader 
     private ComputeShader instantiatedGrassComputeShader;
-    // An instantiated copy of the triangle to vertex compute shader
+    // An instantiated copy of the triangle to vertex compute shader 
     private ComputeShader instantiatedTriToVertComputeShader;
     // An instantiated copy of the material
-    private Material instantiatedMaterial;  
+    private Material instantiatedMaterial;
     // The id of the kernel in the grass compute shader
     private int idGrassKernel;
     // The id of the kernel in the tri to vert count compute shader
@@ -117,11 +117,9 @@ public class ProceduralGrassRenderer : MonoBehaviour
 
         // Create compute buffers
         // The stride is the size, in bytes, each object in the buffer takes up
-        sourceVertBuffer = new ComputeBuffer(vertices.Length, SOURCE_VERT_STRIDE, ComputeBufferType.Structured,
-            ComputeBufferMode.Immutable);
+        sourceVertBuffer = new ComputeBuffer(vertices.Length, SOURCE_VERT_STRIDE, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
         sourceVertBuffer.SetData(vertices);
-        sourceTriBuffer = new ComputeBuffer(tris.Length, SOURCE_TRI_STRIDE, ComputeBufferType.Structured,
-            ComputeBufferMode.Immutable);
+        sourceTriBuffer = new ComputeBuffer(tris.Length, SOURCE_TRI_STRIDE, ComputeBufferType.Structured, ComputeBufferMode.Immutable);
         sourceTriBuffer.SetData(tris);
         drawBuffer = new ComputeBuffer(numTriangles * grassSettings.maxLayers, DRAW_STRIDE, ComputeBufferType.Append);
         drawBuffer.SetCounterValue(0); // Set the count to zero
@@ -134,8 +132,8 @@ public class ProceduralGrassRenderer : MonoBehaviour
         argsBuffer.SetData(new int[] { 0, 1, 0, 0 });
 
         // Cache the kernel IDs we will be dispatching
-        idGrassKernel = grassComputeShader.FindKernel("Main");
-        idTriToVertKernel = triToVertComputeShader.FindKernel("Main");
+        idGrassKernel = instantiatedGrassComputeShader.FindKernel("Main");
+        idTriToVertKernel = instantiatedTriToVertComputeShader.FindKernel("Main");
 
         // Set data on the shaders
         instantiatedGrassComputeShader.SetBuffer(idGrassKernel, "_SourceVertices", sourceVertBuffer);
@@ -146,9 +144,9 @@ public class ProceduralGrassRenderer : MonoBehaviour
         instantiatedGrassComputeShader.SetFloat("_TotalHeight", grassSettings.grassHeight);
         instantiatedGrassComputeShader.SetFloat("_CameraDistanceMin", grassSettings.lodMinCameraDistance);
         instantiatedGrassComputeShader.SetFloat("_CameraDistanceMax", grassSettings.lodMaxCameraDistance);
-        instantiatedGrassComputeShader.SetFloat("_CameraDistanceFactor", grassSettings.lodFactor);
+        instantiatedGrassComputeShader.SetFloat("_CameraDistanceFactor", Mathf.Max(0, grassSettings.lodFactor));
         instantiatedGrassComputeShader.SetFloat("_WorldPositionToUVScale", grassSettings.worldPositionUVScale);
-        if(grassSettings.useWorldPositionAsUV)
+        if (grassSettings.useWorldPositionAsUV)
         {
             instantiatedGrassComputeShader.EnableKeyword("USE_WORLD_POSITION_AS_UV");
         }
@@ -162,7 +160,7 @@ public class ProceduralGrassRenderer : MonoBehaviour
         instantiatedGrassComputeShader.GetKernelThreadGroupSizes(idGrassKernel, out uint threadGroupSize, out _, out _);
         dispatchSize = Mathf.CeilToInt((float)numTriangles / threadGroupSize);
 
-        // Get the bounds of the source mesh
+        // Get the bounds of the source mesh and then expand by the grass height
         localBounds = sourceMesh.bounds;
         localBounds.Expand(grassSettings.grassHeight);
     }
@@ -173,7 +171,7 @@ public class ProceduralGrassRenderer : MonoBehaviour
         if (initialized)
         {
             // If the application is not in play mode, we have to call DestroyImmediate
-            if(Application.isPlaying)
+            if (Application.isPlaying)
             {
                 Destroy(instantiatedGrassComputeShader);
                 Destroy(instantiatedTriToVertComputeShader);
@@ -217,8 +215,9 @@ public class ProceduralGrassRenderer : MonoBehaviour
     // LateUpdate is called after all Update calls
     private void LateUpdate()
     {
-
-        if(Application.isPlaying == false)
+        // If in edit mode, we need to update the shaders each Update to make sure settings changes are applied
+        // Don't worry, in edit mode, Update isn't called each frame
+        if (Application.isPlaying == false)
         {
             OnDisable();
             OnEnable();
@@ -248,7 +247,7 @@ public class ProceduralGrassRenderer : MonoBehaviour
 
         // DrawProceduralIndirect queues a draw call up for our generated mesh
         // It will receive a shadow casting pass, like normal
-        Graphics.DrawProceduralIndirect(material, bounds, MeshTopology.Triangles, argsBuffer, 0,
+        Graphics.DrawProceduralIndirect(instantiatedMaterial, bounds, MeshTopology.Triangles, argsBuffer, 0,
             null, null, ShadowCastingMode.Off, true, gameObject.layer);
     }
 }

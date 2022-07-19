@@ -1,8 +1,10 @@
 // Each #kernel tells a function to compile for dispatch
 #pragma kernel Main
 
-// We need to tell the compiler to compile a versio of this shader
-// With and without the USE_WORLD_POSITION_AS_UV keyword
+#pragma warning (disable : 3571) // Disable a negative pow warning
+
+// We need to tell the compiler to compile a version of this shader
+// with and without the USE_WORLD_POSITION_AS_UV keyword
 #pragma multi_compile _ USE_WORLD_POSITION_AS_UV
 
 // This describes a vertex on the source mesh
@@ -25,7 +27,7 @@ struct DrawVertex {
 // in the graphics shader. This structure facilitates that, and helps us
 // save some memory by sharing some data
 struct DrawTriangle {
-    float2 heights; // clipping height
+    float2 heights; // clipping height, color lerp
     DrawVertex vertices[3];
 };
 // The output triangle buffer, passed to the graphics shader
@@ -38,8 +40,8 @@ int _MaxLayers;
 float _CameraDistanceMin;
 float _CameraDistanceMax;
 float _CameraDistanceFactor;
-float _CameraPosition;
 float _WorldPositionToUVScale;
+float4 _CameraPosition;
 float4x4 _LocalToWorld;
 
 // This converts a source vertex into a draw vertex by converting from OS to WS
@@ -56,8 +58,7 @@ DrawVertex MakeBaseDrawVertex(SourceVertex v) {
 }
 
 // This extrudes a vertex along it's normal
-DrawVertex ExtrudeVertex(DrawVertex v, float height)
-{
+DrawVertex ExtrudeVertex(DrawVertex v, float height) {
     DrawVertex o;
     // Set the position by extruding along the normal, at a fraction of the total height
     o.positionWS = v.positionWS + v.normalWS * (height * _TotalHeight);
@@ -66,18 +67,17 @@ DrawVertex ExtrudeVertex(DrawVertex v, float height)
     return o;
 }
 
-float GetDistanceFormCamera(DrawVertex v)
-{
+float GetDistanceFromCamera(DrawVertex v) {
     return distance(v.positionWS.xyz, _CameraPosition.xyz);
 }
 
 // Calculate the number of layers by applying LOD settings
-int GetNumLayers(DrawVertex a, DrawVertex b, DrawVertex c)
-{
+int GetNumLayers(DrawVertex a, DrawVertex b, DrawVertex c) {
     float dA = GetDistanceFromCamera(a);
     float dB = GetDistanceFromCamera(b);
     float dC = GetDistanceFromCamera(c);
-    // Each vertex in the triangle must have the same amount of layers, so use the fistance to the closest vertex
+    // Each vertex in the triangle must have the same amount of layers, so use the
+    // distance to the closest vertex
     float d = min(dA, min(dB, dC));
     // Unlerp between the min and max camera distance, and invert so 0 is at maximum distance
     d = 1 - smoothstep(_CameraDistanceMin, _CameraDistanceMax, d);
@@ -110,7 +110,7 @@ void Main(uint3 id : SV_DispatchThreadID) {
 
     // Calculate the number of layers for this triangle
     int numLayers = GetNumLayers(inputs[0], inputs[1], inputs[2]);
-    // To get LOD to look right, we will calculate three different heights
+    // To get LOD to look right, we will calulate three different heights
     // posHeight: the distance to extrude the layer
     // texHeight: the height to use in the clipping algorithm on the graphics shader
     // colorHeight: the lerp value to use when calculating the grass color
@@ -119,9 +119,8 @@ void Main(uint3 id : SV_DispatchThreadID) {
     float colorOffset = (_MaxLayers - numLayers) / 2.0f;
 
     // For each layer
-    for (i = 0; i < numLayers; i++)
-    {
-        // The posHeight ranges from 0 to 1 over this loop. Notably, it is 0 if numlayers is 1
+    for (i = 0; i < numLayers; i++) {
+        // The posHeight ranges from 0 to 1 over this loop. Notably, it is 0 if numLayers is 1
         float posHeight = (float)i / max(1, numLayers - 1.0f);
         // The texHeight ranges from 0 to (numLayers - 1) / numLayers. If this reached 1, the top layer would be invisible
         float texHeight = (float)i / numLayers;
@@ -129,11 +128,10 @@ void Main(uint3 id : SV_DispatchThreadID) {
         // This is so at far distances, the grass does not appear too noisy or dark
         float colorHeight = (float)(colorOffset + i) / (_MaxLayers - 1.0);
 
-        // Calculate triangle by extruding each vertex
+        // Calculate a triangle by extruding each vertex
         DrawTriangle tri = (DrawTriangle)0;
         tri.heights = float2(texHeight, colorHeight);
-        [unroll] for (int p = 0; p < 3; p++)
-        {
+        [unroll] for (int p = 0; p < 3; p++) {
             tri.vertices[p] = ExtrudeVertex(inputs[p], posHeight);
         }
 

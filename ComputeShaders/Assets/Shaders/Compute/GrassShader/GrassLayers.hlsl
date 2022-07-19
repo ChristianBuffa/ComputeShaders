@@ -15,14 +15,14 @@ struct DrawVertex {
 // We have to insert three draw vertices at once so the triangle stays connected
 // in the graphics shader. This structure does that
 struct DrawTriangle {
-    float2 heights; // clipping height
+    float2 heights; // clipping height, color lerp
     DrawVertex vertices[3];
 };
 // The buffer to draw from
 StructuredBuffer<DrawTriangle> _DrawTriangles;
 
 struct VertexOutput {
-    float4 uvAndHeight  : TEXCOORD0; // UV, no scaling applied, plus the layer height in the z-coord
+    float4 uvAndHeight  : TEXCOORD0; // (U, V, clipping noise height, color lerp)
     float3 positionWS   : TEXCOORD1; // Position in world space
     float3 normalWS     : TEXCOORD2; // Normal vector in world space
 
@@ -56,7 +56,7 @@ VertexOutput Vertex(uint vertexID: SV_VertexID) {
 
     output.positionWS = input.positionWS;
     output.normalWS = input.normalWS;
-    output.uvAndHeight = float4(input.uv, tri.height);
+    output.uvAndHeight = float4(input.uv, tri.heights);
     // Apply shadow caster logic to the CS position
     output.positionCS = CalculatePositionCSWithShadowCasterLogic(output.positionWS, output.normalWS);
 
