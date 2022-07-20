@@ -42,7 +42,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _WindNoiseTexture:
-        m_Texture: {fileID: 2800000, guid: 8cb71acb618bb54439e653ab2d783b96, type: 3}
+        m_Texture: {fileID: 2800000, guid: d90c01351630bb644bd41bfe3bbe7866, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []

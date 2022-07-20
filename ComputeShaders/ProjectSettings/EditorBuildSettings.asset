@@ -6,12 +6,12 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/ShadersTestScene.unity
-    guid: 3ad4b282dd3de6a45930f73994fb049f
+    path: Assets/Scenes/Menu.unity
+    guid: 8342b20891f5f854cbeb1e94c7fabc35
+  - enabled: 1
+    path: Assets/Scenes/GeometryGrass.unity
+    guid: 623f1b72ded79fa4ca46d8e3268cb3b2
   - enabled: 1
     path: Assets/Scenes/ComputeGeometryShader.unity
     guid: 6b30bd909447ef248ac090c656164629
-  - enabled: 1
-    path: Assets/Scenes/GrassShader.unity
-    guid: 4127f0918f642b84ca46847b16e4fa4e
   m_configObjects: {}
