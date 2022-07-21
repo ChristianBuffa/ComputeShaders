@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: GrassLayers
+  m_Name: GrassLayersCompute
   m_Shader: {fileID: 4800000, guid: 5071b3d14f86d3945843d8f1b6819956, type: 3}
   m_ValidKeywords: []
   m_InvalidKeywords: []
